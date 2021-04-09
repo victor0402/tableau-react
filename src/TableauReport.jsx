@@ -196,6 +196,8 @@ class TableauReport extends React.Component {
       }
   
       console.log('Instantiating Tableau.Viz', { vizUrl, options });
+      console.log('Tableau', Tableau);
+      console.log('Tableau.Viz', Tableau.Viz);
       this.viz = new Tableau.Viz(this.container, vizUrl, options);
     } catch (e) {
       console.log('Error Initializing Tableau', e);
