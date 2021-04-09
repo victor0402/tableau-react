@@ -30,7 +30,7 @@ var _tokenizeUrl = require('./tokenizeUrl');
 
 var _tokenizeUrl2 = _interopRequireDefault(_tokenizeUrl);
 
-var _tableau = require('./tableau-2.3.0');
+var _tableau = require('./tableau-2.7.0');
 
 var _tableau2 = _interopRequireDefault(_tableau);
 
@@ -93,8 +93,10 @@ var TableauReport = function (_React$Component) {
         this.initTableau(nextProps.url);
       }
 
+      console.log('componentWillReceiveProps', nextProps);
+
       // Only filters are changed, apply via the API
-      if (!isReportChanged && isFiltersChanged && !isLoading) {
+      if (!isReportChanged && isFiltersChanged && !isLoading && this.sheet) {
         this.applyFilters(nextProps.filters);
       }
 
@@ -185,6 +187,8 @@ var TableauReport = function (_React$Component) {
       var promises = [];
 
       this.setState({ loading: true });
+      console.log('applying filters', filters);
+      console.log('applying filters state', this.state.filters);
 
       for (var key in filters) {
         if (!this.state.filters.hasOwnProperty(key) || !this.compareArrays(this.state.filters[key], filters[key])) {
@@ -228,38 +232,44 @@ var TableauReport = function (_React$Component) {
     value: function initTableau(nextUrl) {
       var _this4 = this;
 
-      var _props2 = this.props,
-          filters = _props2.filters,
-          parameters = _props2.parameters;
+      console.log('Initializing Tableau', this.props);
+      try {
+        var _props2 = this.props,
+            filters = _props2.filters,
+            parameters = _props2.parameters;
 
-      var vizUrl = this.getUrl(nextUrl);
+        var vizUrl = this.getUrl(nextUrl);
 
-      var options = _extends({}, filters, parameters, this.props.options, {
-        onFirstInteractive: function onFirstInteractive() {
-          _this4.workbook = _this4.viz.getWorkbook();
-          _this4.sheet = _this4.workbook.getActiveSheet();
+        var options = _extends({}, filters, parameters, this.props.options, {
+          onFirstInteractive: function onFirstInteractive() {
+            _this4.workbook = _this4.viz.getWorkbook();
+            _this4.sheet = _this4.workbook.getActiveSheet();
 
-          // If child sheets exist, choose them.
-          var hasChildSheets = typeof _this4.sheet.getWorksheets !== 'undefined';
-          if (hasChildSheets) {
-            var childSheets = _this4.sheet.getWorksheets();
+            // If child sheets exist, choose them.
+            var hasChildSheets = typeof _this4.sheet.getWorksheets !== 'undefined';
+            if (hasChildSheets) {
+              var childSheets = _this4.sheet.getWorksheets();
 
-            if (childSheets && childSheets.length) {
-              _this4.sheet = childSheets[0];
+              if (childSheets && childSheets.length) {
+                _this4.sheet = childSheets[0];
+              }
             }
+
+            _this4.props.onLoad && _this4.props.onLoad(new Date());
           }
+        });
 
-          _this4.props.onLoad && _this4.props.onLoad(new Date());
+        // cleanup
+        if (this.viz) {
+          this.viz.dispose();
+          this.viz = null;
         }
-      });
 
-      // cleanup
-      if (this.viz) {
-        this.viz.dispose();
-        this.viz = null;
+        console.log('Instantiating Tableau.Viz', { vizUrl: vizUrl, options: options });
+        this.viz = new _tableau2.default.Viz(this.container, vizUrl, options);
+      } catch (e) {
+        console.log('Error Initializing Tableau', e);
       }
-
-      this.viz = new _tableau2.default.Viz(this.container, vizUrl, options);
     }
   }, {
     key: 'render',
