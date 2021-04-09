@@ -183,7 +183,7 @@ var TableauReport = function (_React$Component) {
     value: function applyFilters(filters) {
       var _this2 = this;
 
-      var REPLACE = _tableau2.default.FilterUpdateType.REPLACE;
+      var REPLACE = window.tableau.FilterUpdateType.REPLACE;
       var promises = [];
 
       this.setState({ loading: true });

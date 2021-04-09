@@ -117,7 +117,7 @@ class TableauReport extends React.Component {
    * @return {void}
    */
   applyFilters(filters) {
-    const REPLACE = Tableau.FilterUpdateType.REPLACE;
+    const REPLACE = window.tableau.FilterUpdateType.REPLACE;
     const promises = [];
 
     this.setState({ loading: true });
