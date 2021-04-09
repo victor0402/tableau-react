@@ -1,6 +1,6 @@
 {
-  "name": "tableau-react",
-  "version": "2.0.0-beta.0",
+  "name": "tableau-react-codelitt",
+  "version": "2.0.0-beta.2",
   "description": "React component for rendering tableau reports using tableau javascript API.",
   "main": "dist/index.js",
   "files": [
@@ -13,7 +13,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/coopermaruyama/tableau-react.git"
+    "url": "git+https://github.com/victor0402/tableau-react.git"
   },
   "keywords": [
     "tableau",
@@ -23,9 +23,9 @@
   "author": "Cooper Maruyama",
   "license": "MIT",
   "bugs": {
-    "url": "https://github.com/coopermaruyama/tableau-react/issues"
+    "url": "https://github.com/victor0402/tableau-react/issues"
   },
-  "homepage": "https://github.com/coopermaruyama/tableau-react#readme",
+  "homepage": "https://github.com/victor0402/tableau-react#readme",
   "peerDependencies": {
     "react": "^15.3.2",
     "react-dom": "^15.3.2",

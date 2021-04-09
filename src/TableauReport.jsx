@@ -4,7 +4,7 @@ import url from 'url';
 import { Promise } from 'es6-promise';
 import shallowequal from 'shallowequal';
 import tokenizeUrl from './tokenizeUrl';
-import Tableau from './tableau-2.3.0';
+import Tableau from './tableau-2.7.0';
 
 const propTypes = {
   filters: PropTypes.object,
@@ -48,6 +48,8 @@ class TableauReport extends React.Component {
     if (isReportChanged) {
       this.initTableau(nextProps.url);
     }
+    
+    console.log('componentWillReceiveProps', nextProps);
 
     // Only filters are changed, apply via the API
     if (!isReportChanged && isFiltersChanged && !isLoading && this.sheet) {
@@ -119,6 +121,8 @@ class TableauReport extends React.Component {
     const promises = [];
 
     this.setState({ loading: true });
+    console.log('applying filters', filters);
+    console.log('applying filters state', this.state.filters);
 
     for (const key in filters) {
       if (
@@ -158,38 +162,44 @@ class TableauReport extends React.Component {
    * @return {void}
    */
   initTableau(nextUrl) {
-    const { filters, parameters } = this.props;
-    const vizUrl = this.getUrl(nextUrl);
-
-    const options = {
-      ...filters,
-      ...parameters,
-      ...this.props.options,
-      onFirstInteractive: () => {
-        this.workbook = this.viz.getWorkbook();
-        this.sheet = this.workbook.getActiveSheet();
-
-        // If child sheets exist, choose them.
-        const hasChildSheets = typeof this.sheet.getWorksheets !== 'undefined';
-        if (hasChildSheets) {
-          const childSheets = this.sheet.getWorksheets();
-
-          if (childSheets && childSheets.length) {
-            this.sheet = childSheets[0];
+    console.log('Initializing Tableau', this.props);
+    try {
+      const { filters, parameters } = this.props;
+      const vizUrl = this.getUrl(nextUrl);
+  
+      const options = {
+        ...filters,
+        ...parameters,
+        ...this.props.options,
+        onFirstInteractive: () => {
+          this.workbook = this.viz.getWorkbook();
+          this.sheet = this.workbook.getActiveSheet();
+      
+          // If child sheets exist, choose them.
+          const hasChildSheets = typeof this.sheet.getWorksheets !== 'undefined';
+          if (hasChildSheets) {
+            const childSheets = this.sheet.getWorksheets();
+        
+            if (childSheets && childSheets.length) {
+              this.sheet = childSheets[0];
+            }
           }
+      
+          this.props.onLoad && this.props.onLoad(new Date());
         }
-
-        this.props.onLoad && this.props.onLoad(new Date());
+      };
+  
+      // cleanup
+      if (this.viz) {
+        this.viz.dispose();
+        this.viz = null;
       }
-    };
-
-    // cleanup
-    if (this.viz) {
-      this.viz.dispose();
-      this.viz = null;
+  
+      console.log('Instantiating Tableau.Viz', { vizUrl, options });
+      this.viz = new Tableau.Viz(this.container, vizUrl, options);
+    } catch (e) {
+      console.log('Error Initializing Tableau', e);
     }
-
-    this.viz = new Tableau.Viz(this.container, vizUrl, options);
   }
 
   render() {
