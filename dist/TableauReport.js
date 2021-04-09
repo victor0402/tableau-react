@@ -266,9 +266,9 @@ var TableauReport = function (_React$Component) {
         }
 
         console.log('Instantiating Tableau.Viz', { vizUrl: vizUrl, options: options });
-        console.log('Tableau', _tableau2.default);
-        console.log('Tableau.Viz', _tableau2.default.Viz);
-        this.viz = new _tableau2.default.Viz(this.container, vizUrl, options);
+        console.log('Tableau', window.tableau);
+        console.log('Tableau.Viz', window.tableau.Viz);
+        this.viz = new window.tableau.Viz(this.container, vizUrl, options);
       } catch (e) {
         console.log('Error Initializing Tableau', e);
       }
