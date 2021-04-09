@@ -123,38 +123,47 @@ class TableauReport extends React.Component {
     this.setState({ loading: true });
     console.log('applying filters', filters);
     console.log('applying filters state', this.state.filters);
-
-    for (const key in filters) {
-      if (
-        !this.state.filters.hasOwnProperty(key) ||
-        !this.compareArrays(this.state.filters[key], filters[key])
-      ) {
-        promises.push(
-          this.sheet.applyFilterAsync(key, filters[key], REPLACE)
-        );
+    try {
+      for (const key in filters) {
+        if (
+          !this.state.filters.hasOwnProperty(key) ||
+          !this.compareArrays(this.state.filters[key], filters[key])
+        ) {
+          promises.push(
+            this.sheet.applyFilterAsync(key, filters[key], REPLACE)
+          );
+        }
       }
+  
+      this.onComplete(promises, () => this.setState({ loading: false, filters }));
+    } catch (e) {
+      console.log('error applying filters', e);
+      this.onComplete(promises, () => this.setState({ loading: false }));
     }
-
-    this.onComplete(promises, () => this.setState({ loading: false, filters }));
   }
 
   applyParameters(parameters) {
     const promises = [];
 
-    for (const key in parameters) {
-      if (
-        !this.state.parameters.hasOwnProperty(key) ||
-        this.state.parameters[key] !== parameters[key]
-      ) {
-        const val = parameters[key];
-        // Ensure that parameters are applied only when we have a workbook
-        if (this.workbook && this.workbook.changeParameterValueAsync) {
-          promises.push(this.workbook.changeParameterValueAsync(key, val));
+    try {
+      for (const key in parameters) {
+        if (
+          !this.state.parameters.hasOwnProperty(key) ||
+          this.state.parameters[key] !== parameters[key]
+        ) {
+          const val = parameters[key];
+          // Ensure that parameters are applied only when we have a workbook
+          if (this.workbook && this.workbook.changeParameterValueAsync) {
+            promises.push(this.workbook.changeParameterValueAsync(key, val));
+          }
         }
       }
+  
+      this.onComplete(promises, () => this.setState({ loading: false, parameters }));
+    } catch (e) {
+      console.log('error applying parameters', e);
+      this.onComplete(promises, () => this.setState({ loading: false }));
     }
-
-    this.onComplete(promises, () => this.setState({ loading: false, parameters }));
   }
 
   /**
@@ -162,7 +171,6 @@ class TableauReport extends React.Component {
    * @return {void}
    */
   initTableau(nextUrl) {
-    console.log('Initializing Tableau', this.props);
     try {
       const { filters, parameters } = this.props;
       const vizUrl = this.getUrl(nextUrl);
@@ -196,9 +204,9 @@ class TableauReport extends React.Component {
       }
   
       console.log('Instantiating Tableau.Viz', { vizUrl, options });
-      console.log('Tableau', window.tableau);
-      console.log('Tableau.Viz', window.tableau.Viz);
+
       this.viz = new window.tableau.Viz(this.container, vizUrl, options);
+      this.setState({ filters });
     } catch (e) {
       console.log('Error Initializing Tableau', e);
     }
