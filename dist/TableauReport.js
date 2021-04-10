@@ -4,6 +4,8 @@ Object.defineProperty(exports, "__esModule", {
   value: true
 });
 
+var _slicedToArray = function () { function sliceIterator(arr, i) { var _arr = []; var _n = true; var _d = false; var _e = undefined; try { for (var _i = arr[Symbol.iterator](), _s; !(_n = (_s = _i.next()).done); _n = true) { _arr.push(_s.value); if (i && _arr.length === i) break; } } catch (err) { _d = true; _e = err; } finally { try { if (!_n && _i["return"]) _i["return"](); } finally { if (_d) throw _e; } } return _arr; } return function (arr, i) { if (Array.isArray(arr)) { return arr; } else if (Symbol.iterator in Object(arr)) { return sliceIterator(arr, i); } else { throw new TypeError("Invalid attempt to destructure non-iterable instance"); } }; }();
+
 var _extends = Object.assign || function (target) { for (var i = 1; i < arguments.length; i++) { var source = arguments[i]; for (var key in source) { if (Object.prototype.hasOwnProperty.call(source, key)) { target[key] = source[key]; } } } return target; };
 
 var _createClass = function () { function defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ("value" in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } } return function (Constructor, protoProps, staticProps) { if (protoProps) defineProperties(Constructor.prototype, protoProps); if (staticProps) defineProperties(Constructor, staticProps); return Constructor; }; }();
@@ -30,9 +32,7 @@ var _tokenizeUrl = require('./tokenizeUrl');
 
 var _tokenizeUrl2 = _interopRequireDefault(_tokenizeUrl);
 
-var _tableau = require('./tableau-2.7.0');
-
-var _tableau2 = _interopRequireDefault(_tableau);
+require('./tableau-2.7.0');
 
 function _interopRequireDefault(obj) { return obj && obj.__esModule ? obj : { default: obj }; }
 
@@ -49,11 +49,13 @@ var propTypes = {
   options: _propTypes2.default.object,
   token: _propTypes2.default.string,
   onLoad: _propTypes2.default.func,
-  query: _propTypes2.default.string
+  query: _propTypes2.default.string,
+  verbose: _propTypes2.default.bool
 };
 
 var defaultProps = {
   loading: false,
+  verbose: false,
   parameters: {},
   filters: {},
   options: {},
@@ -81,8 +83,15 @@ var TableauReport = function (_React$Component) {
       this.initTableau();
     }
   }, {
-    key: 'componentWillReceiveProps',
-    value: function componentWillReceiveProps(nextProps) {
+    key: 'logInfo',
+    value: function logInfo(message, obj) {
+      if (!this.props.verbose) return;
+
+      console.log(message, obj);
+    }
+  }, {
+    key: 'UNSAFE_componentWillReceiveProps',
+    value: function UNSAFE_componentWillReceiveProps(nextProps) {
       var isReportChanged = nextProps.url !== this.props.url;
       var isFiltersChanged = !(0, _shallowequal2.default)(this.props.filters, nextProps.filters, this.compareArrays);
       var isParametersChanged = !(0, _shallowequal2.default)(this.props.parameters, nextProps.parameters);
@@ -93,15 +102,13 @@ var TableauReport = function (_React$Component) {
         this.initTableau(nextProps.url);
       }
 
-      console.log('componentWillReceiveProps', nextProps);
-
       // Only filters are changed, apply via the API
       if (!isReportChanged && isFiltersChanged && !isLoading && this.sheet) {
         this.applyFilters(nextProps.filters);
       }
 
       // Only parameters are changed, apply via the API
-      if (!isReportChanged && isParametersChanged && !isLoading) {
+      if (!isReportChanged && isParametersChanged && !isLoading && this.sheet) {
         this.applyParameters(nextProps.parameters);
       }
 
@@ -175,6 +182,7 @@ var TableauReport = function (_React$Component) {
      * Asynchronously applies filters to the worksheet, excluding those that have
      * already been applied, which is determined by checking against state.
      * @param  {Object} filters
+     * @param  {Boolean} force
      * @return {void}
      */
 
@@ -183,26 +191,33 @@ var TableauReport = function (_React$Component) {
     value: function applyFilters(filters) {
       var _this2 = this;
 
+      var force = arguments.length > 1 && arguments[1] !== undefined ? arguments[1] : false;
+
       var REPLACE = window.tableau.FilterUpdateType.REPLACE;
       var promises = [];
 
       this.setState({ loading: true });
-      console.log('applying filters', filters);
-      console.log('applying filters state', this.state.filters);
+
+      if (!this.sheet) {
+        this.logInfo('this.sheet not initialized!');
+        return;
+      }
+
       try {
         for (var key in filters) {
-          if (!this.state.filters.hasOwnProperty(key) || !this.compareArrays(this.state.filters[key], filters[key])) {
+          if (force || !this.state.filters.hasOwnProperty(key) || !this.compareArrays(this.state.filters[key], filters[key])) {
+            this.logInfo('Applying filter', { filterKey: key, value: filters[key] });
             promises.push(this.sheet.applyFilterAsync(key, filters[key], REPLACE));
           }
         }
 
         this.onComplete(promises, function () {
-          return _this2.setState({ loading: false, filters: filters });
+          _this2.setState({ loading: false, filters: filters });
         });
       } catch (e) {
-        console.log('error applying filters', e);
+        this.logInfo('error applying filters', e);
         this.onComplete(promises, function () {
-          return _this2.setState({ loading: false });
+          _this2.setState({ loading: false });
         });
       }
     }
@@ -228,7 +243,7 @@ var TableauReport = function (_React$Component) {
           return _this3.setState({ loading: false, parameters: parameters });
         });
       } catch (e) {
-        console.log('error applying parameters', e);
+        this.logInfo('error applying parameters', e);
         this.onComplete(promises, function () {
           return _this3.setState({ loading: false });
         });
@@ -268,6 +283,16 @@ var TableauReport = function (_React$Component) {
             }
 
             _this4.props.onLoad && _this4.props.onLoad(new Date());
+
+            // Apply the filters with values when the sheet is loaded
+            var validFilters = Object.fromEntries(Object.entries(filters).filter(function (_ref) {
+              var _ref2 = _slicedToArray(_ref, 2),
+                  _ = _ref2[0],
+                  v = _ref2[1];
+
+              return !!v.length;
+            }));
+            validFilters && _this4.applyFilters(validFilters, true);
           }
         });
 
@@ -277,12 +302,10 @@ var TableauReport = function (_React$Component) {
           this.viz = null;
         }
 
-        console.log('Instantiating Tableau.Viz', { vizUrl: vizUrl, options: options });
-
+        this.logInfo('Instantiating Tableau.Viz', { vizUrl: vizUrl, options: options });
         this.viz = new window.tableau.Viz(this.container, vizUrl, options);
-        this.setState({ filters: filters });
       } catch (e) {
-        console.log('Error Initializing Tableau', e);
+        this.logInfo('Error Initializing Tableau', e);
       }
     }
   }, {

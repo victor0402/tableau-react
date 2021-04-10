@@ -4,7 +4,7 @@ import url from 'url';
 import { Promise } from 'es6-promise';
 import shallowequal from 'shallowequal';
 import tokenizeUrl from './tokenizeUrl';
-import Tableau from './tableau-2.7.0';
+import './tableau-2.7.0';
 
 const propTypes = {
   filters: PropTypes.object,
@@ -14,10 +14,12 @@ const propTypes = {
   token: PropTypes.string,
   onLoad: PropTypes.func,
   query: PropTypes.string,
+  verbose: PropTypes.bool,
 };
 
 const defaultProps = {
   loading: false,
+  verbose: false,
   parameters: {},
   filters: {},
   options: {},
@@ -27,46 +29,50 @@ const defaultProps = {
 class TableauReport extends React.Component {
   constructor(props) {
     super(props);
-
+    
     this.state = {
       filters: props.filters,
       parameters: props.parameters
     };
   }
-
+  
   componentDidMount() {
     this.initTableau();
   }
-
-  componentWillReceiveProps(nextProps) {
+  
+  logInfo(message, obj) {
+    if (!this.props.verbose) return;
+    
+    console.log(message, obj);
+  }
+  
+  UNSAFE_componentWillReceiveProps(nextProps) {
     const isReportChanged = nextProps.url !== this.props.url;
     const isFiltersChanged = !shallowequal(this.props.filters, nextProps.filters, this.compareArrays);
     const isParametersChanged = !shallowequal(this.props.parameters, nextProps.parameters);
     const isLoading = this.state.loading;
-
+    
     // Only report is changed - re-initialize
     if (isReportChanged) {
       this.initTableau(nextProps.url);
     }
     
-    console.log('componentWillReceiveProps', nextProps);
-
     // Only filters are changed, apply via the API
     if (!isReportChanged && isFiltersChanged && !isLoading && this.sheet) {
       this.applyFilters(nextProps.filters);
     }
-
+    
     // Only parameters are changed, apply via the API
-    if (!isReportChanged && isParametersChanged && !isLoading) {
+    if (!isReportChanged && isParametersChanged && !isLoading && this.sheet) {
       this.applyParameters(nextProps.parameters);
     }
-
+    
     // token change, validate it.
     if (nextProps.token !== this.props.token) {
-      this.setState({ didInvalidateToken: false });
+      this.setState({didInvalidateToken: false});
     }
   }
-
+  
   /**
    * Compares the values of filters to see if they are the same.
    * @param  {Array<Number>} a
@@ -77,10 +83,10 @@ class TableauReport extends React.Component {
     if (Array.isArray(a) && Array.isArray(b)) {
       return a.sort().toString() === b.sort().toString();
     }
-
+    
     return undefined;
   }
-
+  
   /**
    * Execute a callback when an array of promises complete, regardless of
    * whether any throw an error.
@@ -88,63 +94,74 @@ class TableauReport extends React.Component {
   onComplete(promises, cb) {
     Promise.all(promises).then(() => cb(), () => cb())
   }
-
+  
   /**
    * Returns a vizUrl, tokenizing it if a token is passed and immediately
    * invalidating it to prevent it from being used more than once.
    */
   getUrl(nextUrl) {
     const newUrl = nextUrl || this.props.url;
-    const { token, query } = this.props;
+    const {token, query} = this.props;
     const parsed = url.parse(newUrl, true);
-
+    
     if (!this.state.didInvalidateToken && token) {
       this.invalidateToken();
       return tokenizeUrl(newUrl, token) + query;
     }
-
+    
     return parsed.protocol + '//' + parsed.host + parsed.pathname + query;
   }
-
+  
   invalidateToken() {
-    this.setState({ didInvalidateToken: true });
+    this.setState({didInvalidateToken: true});
   }
-
+  
   /**
    * Asynchronously applies filters to the worksheet, excluding those that have
    * already been applied, which is determined by checking against state.
    * @param  {Object} filters
+   * @param  {Boolean} force
    * @return {void}
    */
-  applyFilters(filters) {
+  applyFilters(filters, force = false) {
     const REPLACE = window.tableau.FilterUpdateType.REPLACE;
     const promises = [];
-
+  
     this.setState({ loading: true });
-    console.log('applying filters', filters);
-    console.log('applying filters state', this.state.filters);
+  
+    if (!this.sheet) {
+      this.logInfo('this.sheet not initialized!');
+      return;
+    }
+  
     try {
       for (const key in filters) {
         if (
+          force ||
           !this.state.filters.hasOwnProperty(key) ||
           !this.compareArrays(this.state.filters[key], filters[key])
         ) {
+          this.logInfo('Applying filter', { filterKey: key, value: filters[key] });
           promises.push(
-            this.sheet.applyFilterAsync(key, filters[key], REPLACE)
+            this.sheet.applyFilterAsync(key, filters[key], REPLACE),
           );
         }
       }
-  
-      this.onComplete(promises, () => this.setState({ loading: false, filters }));
+    
+      this.onComplete(promises, () => {
+        this.setState({ loading: false, filters });
+      });
     } catch (e) {
-      console.log('error applying filters', e);
-      this.onComplete(promises, () => this.setState({ loading: false }));
+      this.logInfo('error applying filters', e);
+      this.onComplete(promises, () => {
+        this.setState({ loading: false });
+      });
     }
   }
-
+  
   applyParameters(parameters) {
     const promises = [];
-
+    
     try {
       for (const key in parameters) {
         if (
@@ -158,23 +175,23 @@ class TableauReport extends React.Component {
           }
         }
       }
-  
-      this.onComplete(promises, () => this.setState({ loading: false, parameters }));
+      
+      this.onComplete(promises, () => this.setState({loading: false, parameters}));
     } catch (e) {
-      console.log('error applying parameters', e);
-      this.onComplete(promises, () => this.setState({ loading: false }));
+      this.logInfo('error applying parameters', e);
+      this.onComplete(promises, () => this.setState({loading: false}));
     }
   }
-
+  
   /**
    * Initialize the viz via the Tableau JS API.
    * @return {void}
    */
   initTableau(nextUrl) {
     try {
-      const { filters, parameters } = this.props;
+      const {filters, parameters} = this.props;
       const vizUrl = this.getUrl(nextUrl);
-  
+      
       const options = {
         ...filters,
         ...parameters,
@@ -182,38 +199,42 @@ class TableauReport extends React.Component {
         onFirstInteractive: () => {
           this.workbook = this.viz.getWorkbook();
           this.sheet = this.workbook.getActiveSheet();
-      
+          
           // If child sheets exist, choose them.
           const hasChildSheets = typeof this.sheet.getWorksheets !== 'undefined';
           if (hasChildSheets) {
             const childSheets = this.sheet.getWorksheets();
-        
+            
             if (childSheets && childSheets.length) {
               this.sheet = childSheets[0];
             }
           }
-      
+          
           this.props.onLoad && this.props.onLoad(new Date());
+  
+          // Apply the filters with values when the sheet is loaded
+          const validFilters = Object.fromEntries(
+            Object.entries(filters).filter(([_, v]) => !!v.length),
+          );
+          validFilters && this.applyFilters(validFilters, true);
         }
       };
-  
+      
       // cleanup
       if (this.viz) {
         this.viz.dispose();
         this.viz = null;
       }
-  
-      console.log('Instantiating Tableau.Viz', { vizUrl, options });
-
+      
+      this.logInfo('Instantiating Tableau.Viz', {vizUrl, options});
       this.viz = new window.tableau.Viz(this.container, vizUrl, options);
-      this.setState({ filters });
     } catch (e) {
-      console.log('Error Initializing Tableau', e);
+      this.logInfo('Error Initializing Tableau', e);
     }
   }
-
+  
   render() {
-    return <div ref={c => this.container = c} />;
+    return <div ref={c => this.container = c}/>;
   }
 }
 
