@@ -136,15 +136,25 @@ class TableauReport extends React.Component {
   
     try {
       for (const key in filters) {
-        if (
+        const shouldClearFilter = (!filters[key] || !filters[key].length) && this.state.filters.hasOwnProperty(key) && this.state.filters[key].length;
+        
+        if (shouldClearFilter) {
+          this.logInfo('Clearing out filter', { filterKey: key, value: filters[key] });
+          promises.push(
+            this.sheet.clearFilterAsync(key),
+          );
+
+        } else if (filters[key].length && (
           force ||
           !this.state.filters.hasOwnProperty(key) ||
           !this.compareArrays(this.state.filters[key], filters[key])
-        ) {
+        )) {
           this.logInfo('Applying filter', { filterKey: key, value: filters[key] });
           promises.push(
             this.sheet.applyFilterAsync(key, filters[key], REPLACE),
           );
+        } else {
+          this.logInfo('Ignoring filter', { filterKey: key, value: filters[key] });
         }
       }
     
